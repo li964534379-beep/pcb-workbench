@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>PCB 工作台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2315776d'/%3E%3Cpath d='M7 8h18v16H7zM11 12h10v8H11z' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.mjs"></script>
+</head>
+<body>
+  <main class="workbench">
+    <header class="topbar">
+      <div class="brand"><span class="logo" aria-hidden="true">▦</span><strong>PCB 工作台</strong><span class="edition">基础版</span></div>
+      <div class="top-actions">
+        <select id="projects" aria-label="打开已保存的工程"><option value="">选择工程</option></select>
+        <button id="new-project">新建</button>
+        <button id="import-project">导回工程</button>
+        <button id="settings-button" aria-label="模型设置">模型设置</button>
+      </div>
+    </header>
+    <nav class="steps" aria-label="设计流程">
+      <button data-stage="discussion" aria-current="step"><span>1</span>需求与方案</button>
+      <button data-stage="schematic"><span>2</span>原理图</button>
+      <button data-stage="pcb"><span>3</span>PCB 布局布线</button>
+      <button data-stage="export"><span>4</span>导出工程</button>
+      <span id="saved-state" class="saved-state">保存在本机</span>
+    </nav>
+    <div class="workspace">
+      <aside class="chat-panel" aria-label="设计对话">
+        <div class="panel-heading"><strong>设计对话</strong><span id="model-badge">本机 Codex</span></div>
+        <div class="chat-models"><label for="chat-model">模型</label><select id="chat-model" aria-label="聊天模型"><option value="codex">Codex（本机默认）</option></select><button id="refresh-models" type="button" title="从已配置的 API 获取模型列表">获取列表</button></div>
+        <p id="model-hint" class="model-hint">可选择本机 Codex，或连接自己的模型 API。</p>
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <div class="composer-area">
+          <button id="example" class="suggestion">试试：5V 红色 LED 指示板</button>
+          <form id="chat-form">
+            <label for="instruction" class="sr-only">描述需求或修改</label>
+            <textarea id="instruction" placeholder="描述你想做的电路…" maxlength="2000" rows="3" required></textarea>
+            <div class="composer-footer"><span>Enter 发送 · Shift + Enter 换行</span><button id="send" class="primary" type="submit">发送</button></div>
+          </form>
+          <p id="capability" class="caption">首版实做：5V 红色 LED 指示板，支持 220–1000 Ω 电阻。</p>
+        </div>
+      </aside>
+      <section class="stage-panel" aria-label="工程工作区">
+        <div class="panel-heading stage-heading"><strong id="project-name">从一个想法开始</strong><span id="revision" class="mono">未生成</span></div>
+        <section id="plan-panel" class="plan-panel">
+          <div class="eyebrow">从需求到可编辑的工程</div>
+          <h1>把电路想法，变成一块板子。</h1>
+          <p>先聊清用途和供电，再核对方案。确认后生成原理图，检查通过后继续布局布线。</p>
+          <div class="welcome-circuit" aria-hidden="true"><span>电源输入<br><b>J1 · 5V</b></span><i></i><span>限流电阻<br><b>R1</b></span><i></i><span>红色指示灯<br><b>D1</b></span></div>
+          <div id="proposal" class="proposal" hidden></div>
+          <p class="caption scope-note">当前用简单板型跑通真实流程。复杂电路、自动选料和嘉立创原生工程续改仍在开发中。</p>
+        </section>
+        <section id="editor" class="editor" hidden>
+          <div class="editor-heading">
+            <div class="tabs" role="tablist" aria-label="工程视图">
+              <button id="schematic-tab" role="tab" data-view="schematic" aria-controls="canvas" aria-selected="true">原理图</button>
+              <button id="pcb-tab" role="tab" data-view="pcb" aria-controls="canvas" aria-selected="false">PCB</button>
+            </div>
+            <div class="zoom-controls"><button id="zoom-out" aria-label="缩小">−</button><output id="zoom" class="mono">100%</output><button id="zoom-in" aria-label="放大">+</button><button id="fit">适合窗口</button></div>
+          </div>
+          <div class="editor-body">
+            <div class="drawing">
+              <div id="canvas" class="canvas" role="tabpanel" aria-label="工程画布"><div class="canvas-placeholder">确认方案后，这里显示真实工程图。</div></div>
+              <div class="canvas-status"><span id="view-label">SCH-01 · A4</span><span id="coordinates" class="mono">mm</span><label><input id="grid" type="checkbox" checked> 网格</label></div>
+            </div>
+            <aside class="inspector" aria-label="元件属性">
+              <strong>属性</strong>
+              <label class="field-label" for="part-select">选择元件</label><select id="part-select"><option value="">图纸</option></select>
+              <dl id="part-properties"></dl>
+              <form id="resistance-form" hidden><label class="field-label" for="resistance">R1 阻值 / Ω</label><div class="value-input"><input id="resistance" type="number" min="220" max="1000" step="1" required><button type="submit">修改</button></div><p class="caption">先形成修改提案，确认后写入工程并复检。</p></form>
+              <div id="layers" class="layers" hidden><strong>显示图层</strong><label><input type="checkbox" data-layer="front" checked><i class="layer-front"></i>顶层铜箔</label><label><input type="checkbox" data-layer="back" checked><i class="layer-back"></i>底层铜箔</label><label><input type="checkbox" data-layer="silk" checked><i class="layer-silk"></i>顶层丝印</label></div>
+              <div id="history" class="revision-history"></div>
+            </aside>
+          </div>
+        </section>
+        <section id="export-panel" class="export-panel" hidden>
+          <div class="eyebrow">可继续编辑的原生工程</div><h1>工程已准备好。</h1>
+          <p>下载工程 ZIP 后解压，在 KiCad 打开工程文件。嘉立创 EDA 专业版可通过「导入 KiCad」载入这个 ZIP。</p>
+          <div class="export-card"><strong>KiCad 完整工程 · ZIP</strong><ul><li>原理图 .kicad_sch</li><li>已布线 PCB .kicad_pcb</li><li>工程配置 .kicad_pro</li><li>配套符号库和封装库</li></ul><a id="download" class="button primary" download>下载工程</a></div>
+          <p class="caption">KiCad 修改后，把完整工程文件夹压缩为 ZIP，即可导回继续改。嘉立创保存的 .epro / .eprj 暂不能导回本版本。</p>
+        </section>
+        <div id="edit-proposal" class="edit-proposal" hidden></div>
+        <div id="report-panel" class="report-panel" hidden></div>
+        <footer class="workflow-footer"><div class="check-summary"><span id="check-icon" aria-hidden="true">○</span><div><strong id="check-title">等待设计方案</strong><span id="check-detail">先在左侧描述需求</span></div></div><div class="workflow-actions"><button id="explain" hidden>解读检查报告</button><button id="next" class="primary" disabled>确认方案，生成原理图</button></div></footer>
+      </section>
+    </div>
+    <div id="notice" class="notice" role="status" hidden></div>
+  </main>
+  <dialog id="settings-dialog"><form id="settings-form"><div class="dialog-heading"><h2>模型设置</h2><button type="button" data-close="settings-dialog" aria-label="关闭">×</button></div><label class="field-label" for="provider">使用方式</label><select id="provider"><option value="codex">本机 Codex CLI</option><option value="api">自定义兼容 API</option></select><p id="codex-hint" class="caption">使用这台电脑已登录的 Codex。切回本机时，会保留已配置的 API 连接。</p><div id="api-fields" hidden><label class="field-label" for="base-url">API 基础地址</label><input id="base-url" type="url" placeholder="https://api.example.com/v1"><label class="field-label" for="model-name">默认模型名称（选填）</label><input id="model-name" autocomplete="off" maxlength="256" placeholder="可以先获取列表，再选择模型"><label class="field-label" for="api-key">API Key</label><input id="api-key" type="password" autocomplete="off" placeholder="选填"><label id="clear-key-field" class="clear-key" hidden><input id="clear-api-key" type="checkbox"> 清除本次服务保存的 API Key</label><p class="caption">密钥仅保存在本次服务的内存中。应用后，可在聊天区点击「获取列表」选择其他模型；不支持列表的接口可直接填写模型名称。</p></div><div class="dialog-actions"><button type="button" data-close="settings-dialog">取消</button><button class="primary" type="submit">应用设置</button></div></form></dialog>
+  <dialog id="import-dialog"><form id="import-form"><div class="dialog-heading"><h2>导回工程</h2><button type="button" data-close="import-dialog" aria-label="关闭">×</button></div><p>选择在 KiCad 中改过的完整工程 ZIP。导入会生成新工程，保留原文件并重新执行检查。</p><label class="field-label" for="import-file">KiCad 工程 ZIP</label><input id="import-file" type="file" accept=".zip,application/zip" required><p class="caption">首版支持工作台生成的 J1 / R1 / D1 指示板。需要包含工程、原理图、PCB 和配套库，文件主名保持 led-indicator。</p><div class="dialog-actions"><button type="button" data-close="import-dialog">取消</button><button class="primary" type="submit">导入并复检</button></div></form></dialog>
+</body>
+</html>
